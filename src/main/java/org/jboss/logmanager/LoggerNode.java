@@ -90,14 +90,16 @@ final class LoggerNode {
 
     private final SpinLock attachmentLock = new SpinLock();
 
-    private Logger.AttachmentKey<?> att1Key;
-    private Object att1;
+    private Object[] attArray = new Object[1];
 
-    private Logger.AttachmentKey<?> att2Key;
-    private Object att2;
-
-    private Logger.AttachmentKey<?> att3Key;
-    private Object att3;
+//    private Logger.AttachmentKey<?> att1Key;
+//    private Object att1;
+//
+//    private Logger.AttachmentKey<?> att2Key;
+//    private Object att2;
+//
+//    private Logger.AttachmentKey<?> att3Key;
+//    private Object att3;
 
     /**
      * Construct a new root instance.
@@ -385,7 +387,7 @@ final class LoggerNode {
         final SpinLock lock = this.attachmentLock;
         lock.lock();
         try {
-            return key == att1Key ? (V) att1 : key == att2Key ? (V) att2 : key == att3Key ? (V) att3 : null;
+            return key.getId() >= attArray.length ? null : (V) attArray[key.getId()];
         } finally {
             lock.unlock();
         }
@@ -402,46 +404,21 @@ final class LoggerNode {
         final SpinLock lock = this.attachmentLock;
         lock.lock();
         try {
-            Logger.AttachmentKey<?> attachmentKey = this.att1Key;
-            if (attachmentKey == null) {
-                this.att1Key = key;
-                att1 = value;
-                return null;
-            } else if (key == attachmentKey) {
-                try {
-                    return (V) att1;
-                } finally {
-                    att1 = value;
-                }
-            }
-            attachmentKey = this.att2Key;
-            if (attachmentKey == null) {
-                this.att2Key = key;
-                att2 = value;
-                return null;
-            } else if (key == attachmentKey) {
-                try {
-                    return (V) att2;
-                } finally {
-                    att2 = value;
-                }
-            }
-            attachmentKey = this.att3Key;
-            if (attachmentKey == null) {
-                this.att3Key = key;
-                att3 = value;
-                return null;
-            } else if (key == attachmentKey) {
-                try {
-                    return (V) att3;
-                } finally {
-                    att3 = value;
-                }
-            }
+            extend(key);
+            V existing = (V) attArray[key.getId()];
+            attArray[key.getId()] = value;
+            return existing;
         } finally {
             lock.unlock();
         }
-        throw new IllegalStateException("Maximum number of attachments exceeded");
+    }
+
+    private <V> void extend(Logger.AttachmentKey<V> key) {
+        if(key.getId() >= attArray.length) {
+            Object[] newAttArray = new Object[key.getId() + 1];
+            System.arraycopy(attArray, 0, newAttArray, 0, attArray.length);
+            attArray = newAttArray;
+        }
     }
 
     @SuppressWarnings({ "unchecked" })
@@ -455,34 +432,13 @@ final class LoggerNode {
         final SpinLock lock = this.attachmentLock;
         lock.lock();
         try {
-            Logger.AttachmentKey<?> attachmentKey = this.att1Key;
-            if (attachmentKey == null) {
-                this.att1Key = key;
-                att1 = value;
-                return null;
-            } else if (key == attachmentKey) {
-                return (V) att1;
-            }
-            attachmentKey = this.att2Key;
-            if (attachmentKey == null) {
-                this.att2Key = key;
-                att2 = value;
-                return null;
-            } else if (key == attachmentKey) {
-                return (V) att2;
-            }
-            attachmentKey = this.att3Key;
-            if (attachmentKey == null) {
-                this.att3Key = key;
-                att3 = value;
-                return null;
-            } else if (key == attachmentKey) {
-                return (V) att3;
-            }
+            extend(key);
+            V existing = (V) attArray[key.getId()];
+            attArray[key.getId()] = value;
+            return existing;
         } finally {
             lock.unlock();
         }
-        throw new IllegalStateException("Maximum number of attachments exceeded");
     }
 
     @SuppressWarnings({ "unchecked" })
@@ -493,30 +449,9 @@ final class LoggerNode {
         final SpinLock lock = this.attachmentLock;
         lock.lock();
         try {
-            if (key == att1Key) {
-                try {
-                    return (V) att1;
-                } finally {
-                    this.att1Key = null;
-                    this.att1 = null;
-                }
-            } else if (key == att2Key) {
-                try {
-                    return (V) att2;
-                } finally {
-                    this.att2Key = null;
-                    this.att2 = null;
-                }
-            } else if (key == att3Key) {
-                try {
-                    return (V) att3;
-                } finally {
-                    this.att3Key = null;
-                    this.att3 = null;
-                }
-            } else {
-                return null;
-            }
+            V existing = (V) attArray[key.getId()];
+            attArray[key.getId()] = null;
+            return existing;
         } finally {
             lock.unlock();
         }
